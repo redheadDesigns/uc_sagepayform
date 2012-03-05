@@ -1,0 +1,142 @@
+<?php
+/** 
+ * See for Hooks : http://api.ubercart.me/api/drupal/drupal%21includes%21module.inc/group/hooks/7
+*/
+
+
+/**
+ * Implements hook_uc_payment_method().
+ */
+function uc_sagepayform_uc_payment_method() {
+  $methods[] = array(
+    'id' => 'sagepayform',
+    'name' => t('Sagepay'),
+    'title' => theme('uc_sagepayform'),
+    'desc' => t('Redirects to Sagepay Website to use forms'),
+    'callback' => 'uc_payment_method_sagepayform',
+    'weight' => 1,
+    'checkout' => TRUE,
+    'no_gateway' => TRUE,
+  );
+
+  return $methods;
+}
+
+function theme_uc_sagepayform() {
+	return '';
+}
+
+function uc_payment_method_sagepayform($op, &$order, $form = NULL, &$form_state = NULL) {
+	switch ($op) {
+		case 'cart-process':
+			$_SESSION['pay_method'] = $form_state['values']['panes']['payment']['payment_method'];
+			break;
+
+		case 'settings':
+			$form['array_filter'] = array(
+				'#type' => 'value',
+				'#value' => TRUE,
+			);
+			$form['uc_sagepayform'] = array(
+				'#type' => 'vertical_tabs',
+					'#attached' => array(
+						'js' => array(
+						'vertical-tabs' => drupal_get_path('module', 'uc_credit') . '/uc_credit.admin.js',
+					),
+				),
+			);
+			$form['sagepay_basic'] = array(
+				'#type' => 'fieldset',
+				'#title' => t('Basic Settings'),
+				'#group' => 'uc_sagepayform',
+			);
+			$form['sagepay_basic']['vendor'] = array(
+				'#type' => 'textfield',
+				'#title' => t('Vendor'),
+				'#description' => t('The unique company identifier, assigned to you by Sage Pay'),
+				'#default_value' => variable_get('uc_sagepayform_vendor', ''),
+				'#size' => 16,
+				'#required' => TRUE,
+			);
+			$form['sagepay_basic']['txtype'] = array(
+				'#type' => 'select',
+				'#title' => t('TxType'),
+				'#description' => t('Type of transaction to perform. This depends on the what your Sage Pay account supports.<br> Default is <b>PAYMENT</b>'),
+      				'#multiple' => FALSE,
+				'#options' => array(
+					'PAYMENT' => t('PAYMENT'),
+					'DEFERRED' => t('DEFERRED'),
+					'AUTHENTICATE' => t('AUTHENTICATE'),
+				),
+				'#default_value' => variable_get('uc_sagepayform_txtype', 'PAYMENT'),
+				'#required' => TRUE,
+			);
+			$form['sagepay_basic']['encryption_password'] = array(
+				'#type' => 'textfield',
+				'#title' => t('Encryption Password'),
+				'#description' => t('The XOR Encryption password assigned to you by Sage Pay.'),
+				'#default_value' => variable_get('uc_sagepayform_encryption_password', ''),
+				'#size' => 16,
+				'#required' => TRUE,
+			);
+			$form['sagepay_basic']['environment'] = array(
+				'#type' => 'select',
+				'#title' => t('Payment Environment'),
+				'#description' => t('The current payment enviroment.'),
+      				'#multiple' => FALSE,
+				'#options' => array(
+					'simulator' => t('Simulator'),
+					'test' => t('Test'),
+					'live' => t('Live'),
+				),
+				'#default_value' => variable_get('uc_sagepayform_environment', ''),
+				'#required' => TRUE,
+			);
+			
+			$form['sagepay_vps'] = array(
+				'#type' => 'fieldset',
+				'#title' => t('VPS Protocol'),
+				'#group' => 'uc_sagepayform',
+			);
+			$form['sagepay_vps']['protocol'] = array(
+				'#type' => 'textfield',
+				'#title' => t('VPS Protocol'),
+				'#description' => t('This version currently supports version 2.23<br>Only change this if you know what you are doing.'),
+				'#default_value' => variable_get('uc_sagepayform_vps_protocol', '2.23'),
+				'#size' => 16,
+				'#required' => TRUE,
+			);
+			$form['sagepay_urls'] = array(
+				'#type' => 'fieldset',
+				'#title' => t('Payment URLs'),
+				'#group' => 'uc_sagepayform',
+			);
+			$form['sagepay_urls']['uc_sagepayform_simulator_url'] = array(
+				'#type' => 'textfield',
+				'#title' => t('Simulator URL'),
+				'#description' => t('The Sagepay form simulator URL for testing and development.'),
+				'#default_value' => variable_get('uc_sagepayform_simulator_url', 'https://test.sagepay.com/Simulator/VSPFormGateway.asp'),
+				'#element_validate' => array('uc_sagepayform_valid_url'),
+				'#required' => TRUE,
+			);
+			$form['sagepay_urls']['uc_sagepayform_test_url'] = array(
+				'#type' => 'textfield',
+				'#title' => t('Test URL'),
+				'#description' => t('The Sagepay form test environment URL.'),
+				'#default_value' => variable_get('uc_sagepayform_test_url', 'https://test.sagepay.com/gateway/service/vspform-register.vsp'),
+				'#element_validate' => array('uc_sagepayform_valid_url'),
+				'#required' => TRUE,
+			);
+			$form['sagepay_urls']['uc_sagepayform_live_url'] = array(
+				'#type' => 'textfield',
+				'#title' => t('Live URL'),
+				'#description' => t('The Sagepay form live environment URL.'),
+				'#default_value' => variable_get('uc_sagepayform_live_url', 'https://live.sagepay.com/gateway/service/vspform-register.vsp'),
+				'#element_validate' => array('uc_sagepayform_valid_url'),
+				'#required' => TRUE,
+			);
+     			return $form;
+			break;
+	}
+}
+    

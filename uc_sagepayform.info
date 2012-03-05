@@ -1,0 +1,8 @@
+name = UC Sagepay Form
+description = Add support for sagepay form
+core = 7.x
+package = Ubercart - payment
+dependencies[] = uc_payment
+dependencies[] = uc_order
+dependencies[] = uc_cart
+configure = admin/store/settings/payment
