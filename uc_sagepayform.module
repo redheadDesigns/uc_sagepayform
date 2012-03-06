@@ -4,17 +4,14 @@
 */
 
 
-/**
- * Implements hook_uc_payment_method().
- */
 function uc_sagepayform_uc_payment_method() {
   $methods[] = array(
     'id' => 'sagepayform',
     'name' => t('Sagepay'),
-    'title' => theme('uc_sagepayform'),
+    'title' => theme('uc_sagepayform_cards'),
     'desc' => t('Redirects to Sagepay Website to use forms'),
     'callback' => 'uc_payment_method_sagepayform',
-    'weight' => 1,
+    'weight' => 3,
     'checkout' => TRUE,
     'no_gateway' => TRUE,
   );
@@ -22,9 +19,13 @@ function uc_sagepayform_uc_payment_method() {
   return $methods;
 }
 
-function theme_uc_sagepayform() {
-	return '';
+function theme_uc_sagepayform_cards() {
+	$path = drupal_get_path('module', 'uc_sagepayform');
+	drupal_add_css($path . '/css/style.css');
+	$output = theme('image', array('path' => $path . '/images/sage_pay_logo.gif', 'alt' => 'Sagepay'));
+	return $output;
 }
+
 
 function uc_payment_method_sagepayform($op, &$order, $form = NULL, &$form_state = NULL) {
 	switch ($op) {
@@ -139,4 +140,13 @@ function uc_payment_method_sagepayform($op, &$order, $form = NULL, &$form_state 
 			break;
 	}
 }
-    
+
+
+function uc_sagepayform_theme() {
+  return array(
+    'uc_sagepayform_cards' => array(
+      'variables' => array(),
+    ),
+  );
+}
+ 
