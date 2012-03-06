@@ -149,3 +149,95 @@ function uc_sagepayform_theme() {
     ),
   );
 }
+
+function uc_sagepayform_form_alter(&$form, &$form_state, $form_id) {
+	if($form_id == 'uc_cart_checkout_review_form') {
+		//$form['#action '] =  variable_get('uc_sagepayform_'.variable_get('uc_sagepayform_environment').'_url');
+		$form['formAction'] = array (
+ 		  '#type' => 'textfield',
+ 		  '#title' => t ('formAction'),
+ 		  '#value' =>  variable_get('uc_sagepayform_'.variable_get('uc_sagepayform_environment').'_url')
+ 		);
+		$form['VPSProtocol '] = array (
+ 		  '#type' => 'textfield',
+ 		  '#title' => t ('VPSProtocol'),
+ 		  '#value' => variable_get('uc_sagepayform_vps_protocol'),
+ 		);
+		$form['TxType '] = array (
+ 		  '#type' => 'textfield',
+ 		  '#title' => t ('TxType'),
+ 		  '#value' => variable_get('uc_sagepayform_txtype'),
+ 		);
+		$form['Vendor'] = array (
+ 		  '#type' => 'textfield',
+ 		  '#title' => t ('Vendor'),
+ 		  '#value' => variable_get('uc_sagepayform_vendor'),
+ 		);
+ 		
+ 		$encyption_string = sagepayform_encryption_string(variable_get('uc_sagepayform_encryption_password'), $form_state);
+ 		
+		$form['Crypt'] = array (
+ 		  '#type' => 'textfield',
+ 		  '#title' => t ('Crypt'),
+ 		  '#value' => $encyption_string,
+ 		);
+	}
+}
+
+function sagepayform_encryption_string($pass, &$form_state) {
+	//build string from form_state
+	
+	$str = 'encyption_string';
+	return sagepayform_encrypt($str, $pass);
+}
+
+/*--
+ - Taken from sagepay php dev pack - includes.php (line 246 onwards)
+--*/
+function sagepayform_encrypt($str, $pass, $type = False) {
+
+	if ($type == "XOR") {
+		//** XOR encryption with Base64 encoding **
+		return base64_encode(simpleXor($str,$pass));
+	} else {
+		//** AES encryption, CBC blocking with PKCS5 padding then HEX encoding - DEFAULT **
+
+		//** use initialization vector (IV) set from $strEncryptionPassword
+	    	//$strIV = $strEncryptionPassword;
+	    	
+	    	//** add PKCS5 padding to the text to be encypted
+	    	$str = addPKCS5Padding($str);
+
+	    	//** perform encryption with PHP's MCRYPT module
+		$strCrypt = mcrypt_encrypt(MCRYPT_RIJNDAEL_128, $pass, $str, MCRYPT_MODE_CBC, $pass);
+		
+		//** perform hex encoding and return
+		return "@" . bin2hex($strCrypt);
+	}
+}
+
+function sagepayform_decrypt($str) {}
+
+// New function added 2011-12-29 
+// Need to remove padding bytes from end of decoded string
+function removePKCS5Padding($decrypted) {
+	$padChar = ord($decrypted[strlen($decrypted) - 1]);
+    return substr($decrypted, 0, -$padChar); 
+}
+
+//** PHP's mcrypt does not have built in PKCS5 Padding, so we use this
+function addPKCS5Padding($input)
+{
+   $blocksize = 16;
+   $padding = "";
+
+   // Pad input to an even block size boundary
+   $padlength = $blocksize - (strlen($input) % $blocksize);
+   for($i = 1; $i <= $padlength; $i++) {
+      $padding .= chr($padlength);
+   }
+   
+   return $input . $padding;
+}
+
+
