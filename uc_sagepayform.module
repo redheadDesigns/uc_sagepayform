@@ -151,7 +151,7 @@ function uc_sagepayform_theme() {
 function uc_sagepayform_form_alter(&$form, &$form_state, $form_id) {
 	if($form_id == 'uc_cart_checkout_review_form' && $form_state['uc_order']->payment_method == 'sagepayform') {		
 		
-      		$form['#action'] =  variable_get('uc_sagepayform_'.variable_get('uc_sagepayform_environment').'_url');
+      		$form['#action'] =  variable_get('uc_sagepayform_' . variable_get('uc_sagepayform_environment') . '_url');
 		
 		$form['VPSProtocol'] = array (
 			'#type' => 'hidden',
@@ -224,7 +224,7 @@ function sagepayform_encryption_string(&$form_state, $pass, $postVars_test = Fal
 	
 	$billing_country = uc_get_country_data(array('country_id' => $form_state['uc_order']->billing_country));
 	$postVars['BillingCountry'] =  $billing_country[0]['country_iso_code_2'];
-	if (strlen($form_state['uc_order']->billing_zone) > 0) {$postVars['BillingState'] =  uc_get_zone_code($form_state['uc_order']->billing_zone);}
+	if ($billing_country[0]['country_iso_code_2'] == 'US' && strlen($form_state['uc_order']->billing_zone) > 0) {$postVars['BillingState'] =  uc_get_zone_code($form_state['uc_order']->billing_zone);}
 	if (strlen($form_state['uc_order']->billing_phone) > 0) {$postVars['BillingPhone'] =  $form_state['uc_order']->billing_phone;}
 	
 	// Delivery
@@ -237,7 +237,7 @@ function sagepayform_encryption_string(&$form_state, $pass, $postVars_test = Fal
 	
 	$delivery_country = uc_get_country_data(array('country_id' => $form_state['uc_order']->delivery_country));
 	$postVars['DeliveryCountry'] =  $delivery_country[0]['country_iso_code_2'];
-	if (strlen($form_state['uc_order']->delivery_zone) > 0) {$postVars['DeliveryState'] =  uc_get_zone_code($form_state['uc_order']->delivery_zone);}
+	if ($delivery_country[0]['country_iso_code_2'] == 'US' && strlen($form_state['uc_order']->delivery_zone) > 0) {$postVars['DeliveryState'] =  uc_get_zone_code($form_state['uc_order']->delivery_zone);}
 	if (strlen($form_state['uc_order']->delivery_phone) > 0) {$postVars['DeliveryPhone'] =  $form_state['uc_order']->delivery_phone;}
 
 	
@@ -263,7 +263,7 @@ function sagepayform_encryption_string(&$form_state, $pass, $postVars_test = Fal
 	}
 	
 	if($postVars_test === True) { return ltrim($strPost, '&');}
-	return sagepayform_encrypt(ltrim($strPost, '&'), $pass);
+	return sagepayform_encrypt(ltrim($strPost, '&'), $pass, 'XOR');
 }
 
 
@@ -279,7 +279,8 @@ function sagepayform_encrypt($str, $pass, $type = False) {
 
 		//** use initialization vector (IV) set from $strEncryptionPassword
 		$strIV = $pass;
-		//** perform hex encoding and return
+		
+		////** perform hex encoding and return
 		return "@" . bin2hex(mcrypt_encrypt(MCRYPT_RIJNDAEL_128, $pass, addPKCS5Padding($str), MCRYPT_MODE_CBC, $strIV));
 	}
 }
