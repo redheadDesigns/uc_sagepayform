@@ -2,19 +2,17 @@
 /** 
  * See for Hooks : http://api.ubercart.me/api/drupal/drupal%21includes%21module.inc/group/hooks/7
 */
-
-
 function uc_sagepayform_uc_payment_method() {
-  $methods[] = array(
-    'id' => 'sagepayform',
-    'name' => t('Sagepay'),
-    'title' => theme('uc_sagepayform_cards'),
-    'desc' => t('Redirects to Sagepay Website to use forms'),
-    'callback' => 'uc_payment_method_sagepayform',
-    'weight' => 3,
-    'checkout' => TRUE,
-    'no_gateway' => TRUE,
-  );
+	$methods[] = array(
+		'id' => 'sagepayform',
+		'name' => t('Sagepay'),
+		'title' => theme('uc_sagepayform_cards'),
+		'desc' => t('Redirects to Sagepay Website to use forms'),
+		'callback' => 'uc_payment_method_sagepayform',
+		'weight' => 3,
+		'checkout' => TRUE,
+		'no_gateway' => TRUE,
+	);
 
   return $methods;
 }
@@ -151,93 +149,234 @@ function uc_sagepayform_theme() {
 }
 
 function uc_sagepayform_form_alter(&$form, &$form_state, $form_id) {
-	if($form_id == 'uc_cart_checkout_review_form') {
-		//$form['#action '] =  variable_get('uc_sagepayform_'.variable_get('uc_sagepayform_environment').'_url');
-		$form['formAction'] = array (
- 		  '#type' => 'textfield',
- 		  '#title' => t ('formAction'),
- 		  '#value' =>  variable_get('uc_sagepayform_'.variable_get('uc_sagepayform_environment').'_url')
- 		);
-		$form['VPSProtocol '] = array (
- 		  '#type' => 'textfield',
- 		  '#title' => t ('VPSProtocol'),
- 		  '#value' => variable_get('uc_sagepayform_vps_protocol'),
- 		);
-		$form['TxType '] = array (
- 		  '#type' => 'textfield',
- 		  '#title' => t ('TxType'),
- 		  '#value' => variable_get('uc_sagepayform_txtype'),
- 		);
+	if($form_id == 'uc_cart_checkout_review_form' && $form_state['uc_order']->payment_method == 'sagepayform') {		
+		
+      		$form['#action'] =  variable_get('uc_sagepayform_'.variable_get('uc_sagepayform_environment').'_url');
+		
+		$form['VPSProtocol'] = array (
+			'#type' => 'hidden',
+			'#value' => variable_get('uc_sagepayform_vps_protocol'),
+		);
+		
+		$form['TxType'] = array (
+			'#type' => 'hidden',
+			'#value' => variable_get('uc_sagepayform_txtype'),
+		);
+		
 		$form['Vendor'] = array (
- 		  '#type' => 'textfield',
- 		  '#title' => t ('Vendor'),
- 		  '#value' => variable_get('uc_sagepayform_vendor'),
- 		);
- 		
- 		$encyption_string = sagepayform_encryption_string(variable_get('uc_sagepayform_encryption_password'), $form_state);
- 		
+			'#type' => 'hidden',
+			'#value' => variable_get('uc_sagepayform_vendor'),
+		);
+		
 		$form['Crypt'] = array (
- 		  '#type' => 'textfield',
- 		  '#title' => t ('Crypt'),
- 		  '#value' => $encyption_string,
- 		);
+			'#type' => 'hidden',
+			'#title' => t ('Crypt'),
+			'#value' => sagepayform_encryption_string($form_state, variable_get('uc_sagepayform_encryption_password')),
+		);
 	}
+	
 }
 
-function sagepayform_encryption_string($pass, &$form_state) {
+function sagepayform_encryption_string(&$form_state, $pass, $postVars_test = False) {
 	//build string from form_state
+	$postVars = array();
 	
-	$str = 'encyption_string';
-	return sagepayform_encrypt($str, $pass);
+	// Form crypt field. For more details see the Form Protocol 2.23 /// Must be unique for each transaction.
+	$postVars['VendorTxCode'] = variable_get('uc_sagepayform_vendor') . '-' . date("ymdHis", time()) . '-' . rand(0,32000)*rand(0,32000);
+	
+	// Success/Failure Redirect Paths.
+	$postVars['SuccessURL'] = 'http://localhost/orderSuccessful.php';
+	$postVars['FailureURL'] = 'http://localhost/orderFailed.php';
+	
+	// Optional : CustomerName
+	$postVars['CustomerName'] = $form_state['uc_order']->delivery_first_name . ' ' . $form_state['uc_order']->delivery_last_name;
+	
+	// Optional : ReferrerID
+	
+	
+	// Cart Costs
+	$postVars['Amount'] = number_format($form_state['uc_order']->order_total , 2 ); // 2 dp
+	$postVars['Currency'] = $form_state['uc_order']->currency;
+	
+	$description = '';
+	foreach($form_state['uc_order']->products as $prod) {
+		$description .= '\n' . $prod->title;
+	}
+	$postVars['Description'] = substr(ltrim($description, '\n'), 0, 100); // 100 char max
+	
+/* Email settings:
+** Flag 'SendEMail' is an Optional setting. 
+** 0 = Do not send either customer or vendor e-mails, 
+** 1 = Send customer and vendor e-mails if address(es) are provided(DEFAULT). 
+** 2 = Send Vendor Email but not Customer Email. If you do not supply this field, 1 is assumed and e-mails are sent if addresses are provided.
+**/
+	
+	
+	
+	
+	// Billing
+	$postVars['BillingFirstnames'] =  $form_state['uc_order']->billing_first_name;
+	$postVars['BillingSurname'] =  $form_state['uc_order']->billing_last_name;
+	$postVars['BillingAddress1'] =  $form_state['uc_order']->billing_street1;
+	if (strlen($form_state['uc_order']->billing_street2) > 0) {$postVars['BillingAddress2'] =  $form_state['uc_order']->billing_street2;}
+	$postVars['BillingCity'] =  $form_state['uc_order']->billing_city;
+	$postVars['BillingPostCode'] =  $form_state['uc_order']->billing_postal_code;
+	
+	$billing_country = uc_get_country_data(array('country_id' => $form_state['uc_order']->billing_country));
+	$postVars['BillingCountry'] =  $billing_country[0]['country_iso_code_2'];
+	if (strlen($form_state['uc_order']->billing_zone) > 0) {$postVars['BillingState'] =  uc_get_zone_code($form_state['uc_order']->billing_zone);}
+	if (strlen($form_state['uc_order']->billing_phone) > 0) {$postVars['BillingPhone'] =  $form_state['uc_order']->billing_phone;}
+	
+	// Delivery
+	$postVars['DeliveryFirstnames'] =  $form_state['uc_order']->delivery_first_name;
+	$postVars['DeliverySurname'] =  $form_state['uc_order']->delivery_last_name;
+	$postVars['DeliveryAddress1'] =  $form_state['uc_order']->delivery_street1;
+	if (strlen($form_state['uc_order']->delivery_street2) > 0) {$postVars['DeliveryAddress2'] =  $form_state['uc_order']->delivery_street2;}
+	$postVars['DeliveryCity'] =  $form_state['uc_order']->delivery_city;
+	$postVars['DeliveryPostCode'] =  $form_state['uc_order']->delivery_postal_code;
+	
+	$delivery_country = uc_get_country_data(array('country_id' => $form_state['uc_order']->delivery_country));
+	$postVars['DeliveryCountry'] =  $delivery_country[0]['country_iso_code_2'];
+	if (strlen($form_state['uc_order']->delivery_zone) > 0) {$postVars['DeliveryState'] =  uc_get_zone_code($form_state['uc_order']->delivery_zone);}
+	if (strlen($form_state['uc_order']->delivery_phone) > 0) {$postVars['DeliveryPhone'] =  $form_state['uc_order']->delivery_phone;}
+
+	
+	
+	//$strPost=$strPost . "&Basket=" . $strBasket; // As created above 
+
+
+// For charities registered for Gift Aid, set to 1 to display the Gift Aid check box on the payment pages
+//$strPost=$strPost . "&AllowGiftAid=0";
+	
+/* Allow fine control over AVS/CV2 checks and rules by changing this value. 0 is Default 
+** It can be changed dynamically, per transaction, if you wish.  See the Server Protocol document */
+//if ($strTransactionType!=="AUTHENTICATE") $strPost=$strPost . "&ApplyAVSCV2=0";
+	
+/* Allow fine control over 3D-Secure checks and rules by changing this value. 0 is Default 
+** It can be changed dynamically, per transaction, if you wish.  See the Form Protocol document */
+//$strPost=$strPost . "&Apply3DSecure=0";
+
+	
+	$strPost = '';
+	foreach($postVars as $k => $v) {
+		$strPost .= '&' . $k . '=' . $v;
+	}
+	
+	if($postVars_test === True) { return ltrim($strPost, '&');}
+	return sagepayform_encrypt(ltrim($strPost, '&'), $pass);
 }
+
 
 /*--
- - Taken from sagepay php dev pack - includes.php (line 246 onwards)
+ - Taken from sagepay php dev pack and edited - includes.php (line 246 onwards)
 --*/
 function sagepayform_encrypt($str, $pass, $type = False) {
-
 	if ($type == "XOR") {
 		//** XOR encryption with Base64 encoding **
-		return base64_encode(simpleXor($str,$pass));
+		return base64Encode(simpleXor($str,$pass));
 	} else {
 		//** AES encryption, CBC blocking with PKCS5 padding then HEX encoding - DEFAULT **
 
 		//** use initialization vector (IV) set from $strEncryptionPassword
-	    	//$strIV = $strEncryptionPassword;
-	    	
-	    	//** add PKCS5 padding to the text to be encypted
-	    	$str = addPKCS5Padding($str);
-
-	    	//** perform encryption with PHP's MCRYPT module
-		$strCrypt = mcrypt_encrypt(MCRYPT_RIJNDAEL_128, $pass, $str, MCRYPT_MODE_CBC, $pass);
-		
+		$strIV = $pass;
 		//** perform hex encoding and return
-		return "@" . bin2hex($strCrypt);
+		return "@" . bin2hex(mcrypt_encrypt(MCRYPT_RIJNDAEL_128, $pass, addPKCS5Padding($str), MCRYPT_MODE_CBC, $strIV));
 	}
 }
 
-function sagepayform_decrypt($str) {}
+function sagepayform_decrypt($str, $pass) {
+	if (substr($str,0,1) == '@') {
+		$strIV = $pass;
+	    	//** remove the first char which is @ to flag this is AES encrypted
+	    	$str = substr($str , 1); 
+    	
+	    	//** HEX decoding
+	    	$str = pack('H*' , $str);
+		return removePKCS5Padding(mcrypt_decrypt(MCRYPT_RIJNDAEL_128, $pass, $str, MCRYPT_MODE_CBC, $strIV)); 
+		
+	} else {
+	
+		//** Base 64 decoding plus XOR decryption **
+		return simpleXor(base64Decode($str),$pass);
+	}
 
-// New function added 2011-12-29 
+}
+
+
+
+/*--
+ - Taken from sagepay php dev pack - includes.php 
+--*/
+
+
 // Need to remove padding bytes from end of decoded string
 function removePKCS5Padding($decrypted) {
 	$padChar = ord($decrypted[strlen($decrypted) - 1]);
-    return substr($decrypted, 0, -$padChar); 
+	return substr($decrypted, 0, -$padChar); 
 }
 
 //** PHP's mcrypt does not have built in PKCS5 Padding, so we use this
 function addPKCS5Padding($input)
 {
-   $blocksize = 16;
-   $padding = "";
+	$blocksize = 16;
+	$padding = "";
 
-   // Pad input to an even block size boundary
-   $padlength = $blocksize - (strlen($input) % $blocksize);
-   for($i = 1; $i <= $padlength; $i++) {
-      $padding .= chr($padlength);
-   }
-   
-   return $input . $padding;
+	// Pad input to an even block size boundary
+	$padlength = $blocksize - (strlen($input) % $blocksize);
+	for($i = 1; $i <= $padlength; $i++) {
+		$padding .= chr($padlength);
+	}
+
+	return $input . $padding;
 }
 
+function simpleXor($InString, $Key) {
+  // Initialise key array
+  $KeyList = array();
+  // Initialise out variable
+  $output = "";
+  
+  // Convert $Key into array of ASCII values
+  for($i = 0; $i < strlen($Key); $i++){
+    $KeyList[$i] = ord(substr($Key, $i, 1));
+  }
 
+  // Step through string a character at a time
+  for($i = 0; $i < strlen($InString); $i++) {
+    // Get ASCII code from string, get ASCII code from key (loop through with MOD), XOR the two, get the character from the result
+    // % is MOD (modulus), ^ is XOR
+    $output.= chr(ord(substr($InString, $i, 1)) ^ ($KeyList[$i % strlen($Key)]));
+  }
+
+  // Return the result
+  return $output;
+}
+
+/* Base 64 Encoding function **
+** PHP does it natively but just for consistency and ease of maintenance, let's declare our own function **/
+function base64Encode($plain) {
+  // Initialise output variable
+  $output = "";
+  
+  // Do encoding
+  $output = base64_encode($plain);
+  
+  // Return the result
+  return $output;
+}
+
+/* Base 64 decoding function **
+** PHP does it natively but just for consistency and ease of maintenance, let's declare our own function **/
+function base64Decode($scrambled) {
+  // Initialise output variable
+  $output = "";
+  
+  // Fix plus to space conversion issue
+  $scrambled = str_replace(" ","+",$scrambled);
+  
+  // Do encoding
+  $output = base64_decode($scrambled);
+  
+  // Return the result
+  return $output;
+}
